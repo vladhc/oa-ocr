@@ -1,0 +1,11 @@
+jupyterlab>=3.0.0
+scikit-learn>=0.24.0
+pandas>=1.2.0
+jupyter-http-over-ws>=0.0.8
+tensorflow-gpu>=2.4.0
+tqdm>=4.55.1
+Pillow>=8.1.0
+matplotlib>=3.3.3
+Shapely>=1.7.1
+pyclipper>=1.2.1
+pyyaml>=5.4.1
