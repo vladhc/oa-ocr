@@ -23,6 +23,7 @@ def get_checkpoints(model_id: str) -> List[str]:
     checkpoints = glob(os.path.join(TRAIN_DIR, model_id, "model.*.hdf5"))
     return sorted(list(checkpoints))
 
+
 def get_latest_checkpoint(model_id: str) -> str:
     assert model_id
     checkpoints = get_checkpoints(model_id)

@@ -8,7 +8,7 @@ from commons import DATASET_DIR
 
 
 BATCH_SIZE = 32
-IMG_SIZE = (320, 224) # (480, 640)  # should be dividable by 32
+IMG_SIZE = (320, 224)  # (480, 640)  # should be dividable by 32
 
 
 def main():

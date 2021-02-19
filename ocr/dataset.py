@@ -1,4 +1,4 @@
-from typing import Tuple, Mapping
+from typing import Tuple, Mapping, List
 import pathlib
 import functools
 
@@ -19,14 +19,17 @@ def decode_image(record: Mapping[str, tf.Tensor]) -> Mapping[str, tf.Tensor]:
         'threshold_map': tf.io.decode_png(record['threshold_map']),
     }
 
-def resize(record: Mapping[str, tf.Tensor], target_size: Tuple[int, int]) -> Mapping[str, tf.Tensor]:
-    resize = functools.partial(
+def resize(
+        record: Mapping[str, tf.Tensor],
+        target_size: Tuple[int, int]) -> Mapping[str, tf.Tensor]:
+
+    resize_fn = functools.partial(
         tf.image.resize,
         size=target_size)
     return {
-        'img': resize(record['img']),
-        'prob_map': resize(record['prob_map']),
-        'threshold_map': resize(record['threshold_map']),
+        'img': resize_fn(record['img']),
+        'prob_map': resize_fn(record['prob_map']),
+        'threshold_map': resize_fn(record['threshold_map']),
     }
 
 def cast(record: Mapping[str, tf.Tensor]) -> Mapping[str, tf.Tensor]:
@@ -37,12 +40,12 @@ def cast(record: Mapping[str, tf.Tensor]) -> Mapping[str, tf.Tensor]:
     }
 
 def create_dataset(
-        fpaths: pathlib.Path,
+        fpaths: List[pathlib.Path],
         img_size: Tuple[int, int],
         batch_size=32) -> tf.data.Dataset:
 
-    fpaths = [str(p) for p in fpaths]
-    dataset = tf.data.TFRecordDataset(list(fpaths))
+    dataset = tf.data.TFRecordDataset(list([
+        str(p) for p in fpaths]))
     dataset = dataset.map(decode_fn)
     dataset = dataset.map(decode_image)
     dataset = dataset.map(functools.partial(resize, target_size=img_size))

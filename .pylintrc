@@ -1,0 +1,16 @@
+[BASIC]
+# Good variable names which should always be accepted, separated by a comma.
+good-names=i,
+           j,
+           k,
+           x,
+           ex,
+           Run,
+           _
+
+[MASTER]
+disable=
+    C0114, # missing-module-docstring
+    C0116, # missing-function-docstring
+    C0115, # missing-class-docstring
+    R0901, # too-many-ancestors

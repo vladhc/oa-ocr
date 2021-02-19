@@ -15,7 +15,7 @@ import commons
 assert tf.config.list_physical_devices('GPU')
 
 
-IMG_SIZE = (320, 224) # (480, 640)  # should be dividable by 32
+IMG_SIZE = (320, 224)  # (480, 640)  # should be dividable by 32
 BATCH_SIZE = 32
 
 
@@ -25,17 +25,30 @@ def train(epochs: int, batch_size: int):
 
     batch_size = batch_size * strategy.num_replicas_in_sync
     dataset = create_dataset(
-        commons.DATASET_DIR.glob('train-*.tfrecord'),
+        list(commons.DATASET_DIR.glob('train-*.tfrecord')),
         img_size=IMG_SIZE,
         batch_size=batch_size)
-    dataset = strategy.experimental_distribute_dataset(dataset)
+    # If not DATA, then we are getting empty batch on one of the workers
+    dataset.options().experimental_distribute.auto_shard_policy = \
+        tf.data.experimental.AutoShardPolicy.DATA
+    dataset = strategy.experimental_distribute_dataset(
+        dataset)
 
     with strategy.scope():
-        img_input = tf.keras.Input(shape=IMG_SIZE + (3,), dtype=tf.float32, name='image_input')
-        prob_map_gt = tf.keras.Input(shape=IMG_SIZE, dtype=tf.float32, name='prob_map_gt')
-        threshold_map_gt = tf.keras.Input(shape=IMG_SIZE, dtype=tf.float32, name='threshold_map_gt')
+        img_input = tf.keras.Input(
+            shape=IMG_SIZE + (3,),
+            dtype=tf.float32,
+            name='image_input')
+        prob_map_gt = tf.keras.Input(
+            shape=IMG_SIZE,
+            dtype=tf.float32,
+            name='prob_map_gt')
+        threshold_map_gt = tf.keras.Input(
+            shape=IMG_SIZE,
+            dtype=tf.float32,
+            name='threshold_map_gt')
 
-        encoder = ImageEncoder(IMG_SIZE + (3,))
+        encoder = ImageEncoder()
         to_prob_map = FeatureToImage()
         to_threshold_map = FeatureToImage()
 
@@ -47,16 +60,20 @@ def train(epochs: int, batch_size: int):
 
         loss_prob_map = tf.keras.losses.BinaryCrossentropy(
             name='loss_prob_map',
-            reduction=tf.keras.losses.Reduction.NONE)(prob_map_gt, prob_map)
-        binary_map_gt = activations.sigmoid(k * (prob_map_gt - threshold_map_gt))
+            reduction=tf.keras.losses.Reduction.NONE,
+        )(prob_map_gt, prob_map)
+        binary_map_gt = activations.sigmoid(
+            k * (prob_map_gt - threshold_map_gt))
 
         loss_binary_map = tf.keras.losses.BinaryCrossentropy(
             name='loss_binary_map',
-            reduction=tf.keras.losses.Reduction.NONE)(binary_map_gt, binary_map)
+            reduction=tf.keras.losses.Reduction.NONE,
+        )(binary_map_gt, binary_map)
 
         loss_threshold_map = tf.keras.losses.MeanAbsoluteError(
             name='loss_threshold_map',
-            reduction=tf.keras.losses.Reduction.NONE)(threshold_map_gt, threshold_map)
+            reduction=tf.keras.losses.Reduction.NONE,
+        )(threshold_map_gt, threshold_map)
         loss = loss_prob_map + 1. * loss_binary_map + 10. * loss_threshold_map
         model = tf.keras.Model(
             inputs=[img_input, prob_map_gt, threshold_map_gt],
@@ -74,10 +91,13 @@ def train(epochs: int, batch_size: int):
 
     @tf.function
     def train_step(batch):
-        assert batch['img'].shape.as_list()[:3] == batch['prob_map'].shape.as_list()[:3]  # all except channels
-        assert batch['img'].shape.as_list()[:3] == batch['threshold_map'].shape.as_list()[:3]  # all except channels
-        assert batch['prob_map'].shape.as_list() == batch['threshold_map'].shape.as_list()
-        assert batch['img'].shape.as_list()[0] > 0, "Empty batch {}".format(batch['img'].shape)
+        img_shape = batch['img'].shape.as_list()
+        prob_map_shape = batch['prob_map'].shape.as_list()
+        threshold_map_shape = batch['threshold_map'].shape.as_list()
+        assert img_shape[:3] == prob_map_shape[:3]  # all except channels
+        assert img_shape[:3] == threshold_map_shape[:3]  # all except channels
+        assert prob_map_shape == threshold_map_shape
+        assert img_shape[0] > 0, "Empty batch {}".format(img_shape)
         with tf.GradientTape() as tape:
             loss = model([
                 batch['img'],
@@ -142,6 +162,7 @@ def train(epochs: int, batch_size: int):
                     logs={
                         "loss": loss_agg.result(),
                     })
+
 
 if __name__ == "__main__":
     train(
