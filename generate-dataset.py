@@ -11,7 +11,7 @@ def generate_dataset():
     for idx in range(10):
         p = multiprocessing.Process(
             target=write_tfrecords,
-            args=(f'eval-{idx}.tfrecord', 1000, (640, 480)))
+            args=(f'train-{idx}.tfrecord', 10000, (640, 480)))
         p.start()
         ps.append(p)
 

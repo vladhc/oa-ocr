@@ -9,6 +9,7 @@ import pyclipper
 from PIL import Image, ImageDraw, ImageFont
 import tqdm
 import tensorflow as tf
+from imgaug import augmenters as iaa
 
 
 FONTS_DIR = pathlib.Path('assets/fonts')
@@ -16,6 +17,8 @@ VOCAB_DIR = pathlib.Path('assets/vocab')
 
 
 FONT_SIZE = (10, 20)
+LINES_COUNT = (2, 30)
+LINE_WIDTH = (1, 3)
 WORDS_COUNT = (3, 300)
 FONT_COLOR = (0, 200)
 BACKGROUND_COLOR = (230, 255)
@@ -23,6 +26,16 @@ SHRINK_RATIO = 0.4
 
 JPEG_FORMAT = 'JPEG'
 PNG_FORMAT = 'PNG'
+
+MAX_ROTATION_DEGREES = 5.
+
+IMAGE_AUG = iaa.Sequential([
+    iaa.Sometimes(0.25, iaa.AdditiveGaussianNoise(scale=(4, 10))),
+    iaa.Sometimes(0.2, iaa.GaussianBlur(sigma=0.7)),
+    iaa.Sometimes(0.1, iaa.Add(value=(0, 20), per_channel=True)),
+    iaa.Sometimes(0.1, iaa.AdditivePoissonNoise(10)),
+    iaa.Sometimes(0.2, iaa.JpegCompression(compression=(10, 30))),
+])
 
 
 def write_tfrecords(fname: str, size: int, img_size: Tuple[int, int]):
@@ -85,6 +98,20 @@ class DatasetGenerator():
             polygons.append(polygon)
             ink = random.randint(*FONT_COLOR)
             draw.text(coord, text, font=fnt, fill=(ink, ink, ink))
+
+        for _ in range(random.randint(*LINES_COUNT)):
+            coords = (
+                random.randint(0, img.width),
+                random.randint(0, img.height),
+                random.randint(0, img.width),
+                random.randint(0, img.height))
+            ink = random.randint(*FONT_COLOR)
+            draw.line(
+                coords,
+                fill=(ink, ink, ink),
+                width=random.randint(*LINE_WIDTH))
+
+        img = Image.fromarray(IMAGE_AUG(images=[np.array(img)])[0])
 
         return img, polygons
 
@@ -193,6 +220,20 @@ def create_example(
     img, polygons = gen.create_sample(img_size)
     prob_map = create_prob_map(polygons, img_size)
     threshold_map = create_threshold_map(polygons, img_size)
+
+    back = random.randint(*BACKGROUND_COLOR)
+    angle = random.uniform(-MAX_ROTATION_DEGREES, MAX_ROTATION_DEGREES)
+    img = img.rotate(
+        angle=angle,
+        expand=0,
+        resample=random.choice([Image.BILINEAR, Image.BICUBIC]),
+        fillcolor=(back, back, back))
+    prob_map = prob_map.rotate(
+        angle=angle,
+        expand=0)
+    threshold_map = threshold_map.rotate(
+        angle=angle,
+        expand=0)
 
     return tf.train.Example(features=tf.train.Features(
         feature={
