@@ -25,8 +25,12 @@ def train(epochs: int, batch_size: int):
     strategy = tf.distribute.MirroredStrategy()
 
     batch_size = batch_size * strategy.num_replicas_in_sync
+    tfrecords = list(
+        pathlib.Path('dataset/generated').glob('train-*.tfrecord'))
+    tfrecords.extend(
+        list(pathlib.Path('dataset/synth-text').glob('train-*.tfrecord')))
     dataset = create_dataset(
-        list(commons.DATASET_DIR.glob('train-*.tfrecord')),
+        tfrecords,
         img_size=IMG_SIZE,
         batch_size=batch_size)
     # If not DATA, then we are getting empty batch on one of the workers
@@ -167,5 +171,5 @@ def train(epochs: int, batch_size: int):
 
 if __name__ == "__main__":
     train(
-        epochs=20,
+        epochs=40,
         batch_size=BATCH_SIZE)
