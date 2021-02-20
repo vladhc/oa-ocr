@@ -1,8 +1,12 @@
 from typing import Tuple, Mapping, List
 import pathlib
 import functools
+import random
 
 import tensorflow as tf
+
+
+AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 
 def decode_fn(record_bytes) -> Mapping[str, tf.Tensor]:
@@ -79,8 +83,6 @@ def create_dataset(
     dataset = dataset.map(
         cast,
         num_parallel_calls=AUTOTUNE)
-    dataset = dataset.batch(
-        batch_size,
-        num_parallel_calls=AUTOTUNE)
+    dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(2)
     return dataset
