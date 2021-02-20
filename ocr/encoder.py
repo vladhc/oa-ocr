@@ -37,11 +37,21 @@ class ImageEncoder(tf.keras.Model):
     # pylint: disable=too-many-locals
     def call(self, inputs, training=False, mask=None):
         img = inputs  # batch x h x w x channels
-        stage1_out = self.resnet_stage_1(img) # h/4 x w/4 x 64
-        stage2_out = self.resnet_stage_2(stage1_out)  # h/4 x w/4 x 256
-        stage3_out = self.resnet_stage_3(stage2_out)  # h/8 x w/8 x 512
-        stage4_out = self.resnet_stage_4(stage3_out)  # h/16 x w/16 x 1024
-        stage5_out = self.resnet_stage_5(stage4_out)  # h/32 x w/32 x 2048
+        stage1_out = self.resnet_stage_1(
+            img,
+            training=training) # h/4 x w/4 x 64
+        stage2_out = self.resnet_stage_2(
+            stage1_out,
+            training=training)  # h/4 x w/4 x 256
+        stage3_out = self.resnet_stage_3(
+            stage2_out,
+            training=training)  # h/8 x w/8 x 512
+        stage4_out = self.resnet_stage_4(
+            stage3_out,
+            training=training)  # h/16 x w/16 x 1024
+        stage5_out = self.resnet_stage_5(
+            stage4_out,
+            training=training)  # h/32 x w/32 x 2048
 
         in2 = self.to_256ch_2(stage2_out)  # h/4 x w/4 x 256
         in3 = self.to_256ch_3(stage3_out)  # h/8 x w/8 x 256
@@ -86,11 +96,11 @@ class FeatureToImage(tf.keras.Model):
     def call(self, inputs, training=False, mask=None):
         x = inputs
         x = self.conv(x)
-        x = self.bn_1(x)
+        x = self.bn_1(x, training=training)
         x = activations.relu(x)
 
         x = self.deconv_1(x)
-        x = self.bn_2(x)
+        x = self.bn_2(x, training=training)
         x = activations.relu(x)
 
         x = self.deconv_2(x)

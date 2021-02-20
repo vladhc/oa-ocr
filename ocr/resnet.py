@@ -126,18 +126,18 @@ class ConvBlock(tf.keras.Model):
         x_shortcut = x
 
         x = self.c_1(x)
-        x = self.bn1(x)
+        x = self.bn1(x, training=training)
         x = activations.relu(x)
 
         x = self.c_2(x)
-        x = self.bn2(x)
+        x = self.bn2(x, training=training)
         x = activations.relu(x)
 
         x = self.c_3(x)
-        x = self.bn3(x)
+        x = self.bn3(x, training=training)
 
         x_shortcut = self.c_4(x_shortcut)
-        x_shortcut = self.bn4(x_shortcut)
+        x_shortcut = self.bn4(x_shortcut, training=training)
 
         x = layers.Add()([x, x_shortcut])
         x = activations.relu(x)
@@ -168,7 +168,9 @@ class IdentityBlock(tf.keras.Model):
             strides=(1, 1),
             padding='valid',
             name=conv_name_base + '2a')
-        self.bn1 = layers.BatchNormalization(axis=3, name=bn_name_base + '2a')
+        self.bn1 = layers.BatchNormalization(
+            axis=3,
+            name=bn_name_base + '2a')
 
         self.c_2 = layers.Conv2D(
             filters=f_2,
@@ -176,7 +178,9 @@ class IdentityBlock(tf.keras.Model):
             strides=(1, 1),
             padding='same',
             name=conv_name_base + '2b')
-        self.bn2 = layers.BatchNormalization(axis=3, name=bn_name_base + '2b')
+        self.bn2 = layers.BatchNormalization(
+            axis=3,
+            name=bn_name_base + '2b')
 
         self.c_3 = layers.Conv2D(
             filters=f_3,
@@ -184,22 +188,24 @@ class IdentityBlock(tf.keras.Model):
             strides=(1, 1),
             padding='valid',
             name=conv_name_base + '2c')
-        self.bn3 = layers.BatchNormalization(axis=3, name=bn_name_base + '2c')
+        self.bn3 = layers.BatchNormalization(
+            axis=3,
+            name=bn_name_base + '2c')
 
     def call(self, inputs, training=False, mask=None):
         x = inputs
         x_shortcut = x
 
         x = self.c_1(x)
-        x = self.bn1(x)
+        x = self.bn1(x, training=training)
         x = activations.relu(x)
 
         x = self.c_2(x)
-        x = self.bn2(x)
+        x = self.bn2(x, training=training)
         x = activations.relu(x)
 
         x = self.c_3(x)
-        x = self.bn3(x)
+        x = self.bn3(x, training=training)
 
         x = layers.Add()([x, x_shortcut])
         x = activations.relu(x)
