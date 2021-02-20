@@ -15,7 +15,8 @@ import commons
 assert tf.config.list_physical_devices('GPU')
 
 
-IMG_SIZE = (320, 224)  # (480, 640)  # should be dividable by 32
+# IMG_SIZE = (480, 640)
+IMG_SIZE = (224, 320)  # (480, 640)  # should be dividable by 32
 BATCH_SIZE = 32
 
 

@@ -14,3 +14,4 @@ disable=
     C0116, # missing-function-docstring
     C0115, # missing-class-docstring
     R0901, # too-many-ancestors
+    I1101, # c-extension-no-member

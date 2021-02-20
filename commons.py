@@ -11,7 +11,8 @@ from tqdm.auto import tqdm
 CHECKPOINT_NAME = "model.{epoch:03d}.hdf5"
 LOGS_DIR = "logs"
 TRAIN_DIR = "train"
-DATASET_DIR = pathlib.Path('dataset/synth-text')
+# DATASET_DIR = pathlib.Path('dataset/synth-text')
+DATASET_DIR = pathlib.Path('dataset/generated')
 
 
 def epoch_from_checkpoint(checkpoint: str) -> int:
