@@ -32,7 +32,9 @@ def train(epochs: int, batch_size: int):
     dataset = create_dataset(
         tfrecords,
         img_size=IMG_SIZE,
+        train=True,
         batch_size=batch_size)
+
     # If not DATA, then we are getting empty batch on one of the workers
     dataset.options().experimental_distribute.auto_shard_policy = \
         tf.data.experimental.AutoShardPolicy.DATA

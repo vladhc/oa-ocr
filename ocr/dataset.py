@@ -42,14 +42,45 @@ def cast(record: Mapping[str, tf.Tensor]) -> Mapping[str, tf.Tensor]:
 def create_dataset(
         fpaths: List[pathlib.Path],
         img_size: Tuple[int, int],
+        train: bool,
         batch_size=32) -> tf.data.Dataset:
 
-    dataset = tf.data.TFRecordDataset(list([
-        str(p) for p in fpaths]))
-    dataset = dataset.map(decode_fn)
-    dataset = dataset.map(decode_image)
-    dataset = dataset.map(functools.partial(resize, target_size=img_size))
-    dataset = dataset.map(cast)
-    dataset = dataset.batch(batch_size)
+    tfrecords = list([str(p) for p in fpaths])
+    assert tfrecords, \
+        "No tfrecord files satisfy filemasks {}".format(filemasks)
+
+    random.shuffle(tfrecords)
+    tfrecord_files = tf.data.Dataset.from_tensor_slices(tfrecords)
+    if train:
+        tfrecord_files = tfrecord_files.shuffle(
+            len(tfrecords),
+            reshuffle_each_iteration=True)
+
+    dataset = tfrecord_files.interleave(
+        tf.data.TFRecordDataset,
+        cycle_length=AUTOTUNE,
+        num_parallel_calls=AUTOTUNE,
+        deterministic=False)
+
+    if train:
+        dataset = dataset.shuffle(
+            batch_size * 30,
+            reshuffle_each_iteration=True)
+
+    dataset = dataset.map(
+        decode_fn,
+        num_parallel_calls=AUTOTUNE)
+    dataset = dataset.map(
+        decode_image,
+        num_parallel_calls=AUTOTUNE)
+    dataset = dataset.map(
+        functools.partial(resize, target_size=img_size),
+        num_parallel_calls=AUTOTUNE)
+    dataset = dataset.map(
+        cast,
+        num_parallel_calls=AUTOTUNE)
+    dataset = dataset.batch(
+        batch_size,
+        num_parallel_calls=AUTOTUNE)
     dataset = dataset.prefetch(2)
     return dataset
