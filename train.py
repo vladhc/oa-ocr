@@ -4,6 +4,7 @@ from typing import List
 
 import tensorflow as tf
 import tensorflow.keras.activations as activations
+import tensorflow.keras.layers as layers
 
 from ocr import ImageEncoder
 from ocr import FeatureToImage
@@ -17,22 +18,24 @@ assert tf.config.list_physical_devices('GPU')
 
 # IMG_SIZE = (480, 640)
 IMG_SIZE = (224, 320)  # (480, 640)  # should be dividable by 32
-BATCH_SIZE = 32
+BATCH_SIZE = 128
+GRAYSCALE = True
 
 
 def train(epochs: int, batch_size: int):
-    model_id = "db"
+    model_id = "db-small-balanced-loss"
     strategy = tf.distribute.MirroredStrategy()
 
     batch_size = batch_size * strategy.num_replicas_in_sync
     tfrecords = list(
         pathlib.Path('dataset/generated').glob('train-*.tfrecord'))
-    tfrecords.extend(
-        list(pathlib.Path('dataset/synth-text').glob('train-*.tfrecord')))
+    # tfrecords.extend(
+        # list(pathlib.Path('dataset/synth-text').glob('train-*.tfrecord')))
     dataset = create_dataset(
         tfrecords,
         img_size=IMG_SIZE,
         train=True,
+        grayscale=GRAYSCALE,
         batch_size=batch_size)
 
     # If not DATA, then we are getting empty batch on one of the workers
@@ -43,21 +46,22 @@ def train(epochs: int, batch_size: int):
 
     with strategy.scope():
         img_input = tf.keras.Input(
-            shape=IMG_SIZE + (3,),
+            shape=IMG_SIZE + (1 if GRAYSCALE else 3,),
             dtype=tf.float32,
             name='image_input')
         prob_map_gt = tf.keras.Input(
-            shape=IMG_SIZE,
+            shape=IMG_SIZE + (1,),
             dtype=tf.float32,
             name='prob_map_gt')
         threshold_map_gt = tf.keras.Input(
-            shape=IMG_SIZE,
+            shape=IMG_SIZE + (1,),
             dtype=tf.float32,
             name='threshold_map_gt')
 
-        encoder = ImageEncoder()
-        to_prob_map = FeatureToImage()
-        to_threshold_map = FeatureToImage()
+        filters_div = 4
+        encoder = ImageEncoder(filters_div, GRAYSCALE)
+        to_prob_map = FeatureToImage(filters_div)
+        to_threshold_map = FeatureToImage(filters_div)
 
         x = encoder(img_input)
         prob_map = to_prob_map(x)
@@ -69,19 +73,24 @@ def train(epochs: int, batch_size: int):
             name='loss_prob_map',
             reduction=tf.keras.losses.Reduction.NONE,
         )(prob_map_gt, prob_map)
+        loss_prob_map = balance_loss(loss_prob_map, prob_map_gt)
+
         binary_map_gt = activations.sigmoid(
             k * (prob_map_gt - threshold_map_gt))
-
         loss_binary_map = tf.keras.losses.BinaryCrossentropy(
             name='loss_binary_map',
             reduction=tf.keras.losses.Reduction.NONE,
         )(binary_map_gt, binary_map)
+        loss_binary_map = balance_loss(loss_binary_map, binary_map_gt)
 
         loss_threshold_map = tf.keras.losses.MeanAbsoluteError(
             name='loss_threshold_map',
             reduction=tf.keras.losses.Reduction.NONE,
         )(threshold_map_gt, threshold_map)
+        loss_threshold_map = balance_loss(loss_threshold_map, threshold_map_gt)
+
         loss = loss_prob_map + 1. * loss_binary_map + 10. * loss_threshold_map
+        loss = tf.reshape(loss, (1,))
         model = tf.keras.Model(
             inputs=[img_input, prob_map_gt, threshold_map_gt],
             outputs=[loss],
@@ -169,6 +178,32 @@ def train(epochs: int, batch_size: int):
                     logs={
                         "loss": loss_agg.result(),
                     })
+
+
+def balance_loss(loss, gt, negative_ratio=3.):
+    loss = tf.reshape(loss, (-1,), name="reshape loss")
+    gt = tf.reshape(gt, (-1,), name="reshape_gt")
+
+    positive_mask = gt
+    negative_mask = tf.math.subtract(1., gt, name="to_negative_mask")
+    assert loss.shape.as_list() == positive_mask.shape.as_list()
+    assert loss.shape.as_list() == negative_mask.shape.as_list()
+    positive_loss = loss * positive_mask
+    negative_loss = loss * negative_mask
+
+    positive_count = tf.reduce_sum(positive_mask)
+    negative_count = tf.reduce_min([
+        tf.reduce_sum(negative_mask),
+        positive_count * negative_ratio,
+    ])
+
+    negative_loss, _ = tf.nn.top_k(
+        negative_loss,
+        tf.cast(negative_count, tf.int32))
+
+    loss = (tf.reduce_sum(positive_loss) + tf.reduce_sum(negative_loss)) / (
+            positive_count + negative_count + 1e-6)
+    return loss
 
 
 if __name__ == "__main__":

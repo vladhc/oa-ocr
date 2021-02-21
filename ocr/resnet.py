@@ -5,68 +5,103 @@ import tensorflow.keras.layers as layers
 import tensorflow.keras.activations as activations
 
 
-def create_resnet_stage(idx: int) -> tf.keras.Model:
+def create_resnet_stage_1(
+    filters_div: int,
+    input_ch: int) -> tf.keras.Model:
 
-    if idx == 1:
-        return tf.keras.Sequential(
-            layers=[
-                layers.Input(shape=(None, None, 3), name='image_input'),
-                layers.ZeroPadding2D((3, 3)),
-                layers.Conv2D(64, (7, 7), strides=(2, 2), name='conv1'),
-                layers.BatchNormalization(axis=3, name='bn_conv1'),
-                layers.Activation('relu'),
-                layers.ZeroPadding2D((1, 1)),
-                layers.MaxPooling2D((3, 3), strides=(2, 2)),
-            ],
-            name='stage1',
-        )
-    if idx == 2:
-        return tf.keras.Sequential(
-            layers=[
-                layers.Input(shape=(None, None, 64), name='stage2_input'),
-                ConvBlock(
-                    kernel_size=3, filters=(64, 64, 256), stage=(2, 'a'), stride=1),
-                IdentityBlock(
-                    kernel_size=3, filters=(64, 64, 256), stage=(2, 'b')),
-                IdentityBlock(kernel_size=3, filters=(64, 64, 256), stage=(2, 'c')),
-            ],
-            name='stage2'
-        )
-    if idx == 3:
-        return tf.keras.Sequential(
-            layers=[
-                layers.Input(shape=(None, None, 256), name='stage3_input'),
-                ConvBlock(kernel_size=3, filters=(128, 128, 512), stage=(3, 'a'), stride=2),
-                IdentityBlock(kernel_size=3, filters=(128, 128, 512), stage=(3, 'b')),
-                IdentityBlock(kernel_size=3, filters=(128, 128, 512), stage=(3, 'c')),
-                IdentityBlock(kernel_size=3, filters=(128, 128, 512), stage=(3, 'd')),
-            ],
-            name='stage3',
-        )
-    if idx == 4:
-        return tf.keras.Sequential(
-            layers=[
-                layers.Input(shape=(None, None, 512), name='stage4_input'),
-                ConvBlock(kernel_size=3, filters=(256, 256, 1024), stage=(4, 'a'), stride=2),
-                IdentityBlock(kernel_size=3, filters=(256, 256, 1024), stage=(4, 'b')),
-                IdentityBlock(kernel_size=3, filters=(256, 256, 1024), stage=(4, 'c')),
-                IdentityBlock(kernel_size=3, filters=(256, 256, 1024), stage=(4, 'd')),
-                IdentityBlock(kernel_size=3, filters=(256, 256, 1024), stage=(4, 'e')),
-                IdentityBlock(kernel_size=3, filters=(256, 256, 1024), stage=(4, 'f')),
-            ],
-            name='stage4',
-        )
-    if idx == 5:
-        return tf.keras.Sequential(
-            layers=[
-                layers.Input(shape=(None, None, 1024), name='stage5_input'),
-                ConvBlock(kernel_size=3, filters=(512, 512, 2048), stage=(5, 'a'), stride=2),
-                IdentityBlock(kernel_size=3, filters=(512, 512, 2048), stage=(5, 'b')),
-                IdentityBlock(kernel_size=3, filters=(512, 512, 2048), stage=(5, 'c')),
-            ],
-            name='stage5',
-        )
-    raise ValueError("ResNet stage index should be in the range 1..5")
+    return tf.keras.Sequential(
+        layers=[
+            layers.Input(shape=(None, None, input_ch), name='image_input'),
+            layers.ZeroPadding2D((3, 3), name='conv1_pad'),
+            layers.Conv2D(
+                int(64 / filters_div),
+                (7, 7),
+                strides=(2, 2),
+                padding='valid',
+                use_bias=False,
+                name='conv1'),
+            layers.BatchNormalization(axis=3, name='bn_conv1'),
+            layers.Activation('relu'),
+            layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same'),
+        ],
+        name='stage1',
+    )
+
+
+def create_resnet_stage_2(filters_div: int):
+    filters = (
+        int(64 / filters_div),
+        int(64 / filters_div),
+        int(256 / filters_div))
+    return tf.keras.Sequential(
+        layers=[
+            layers.Input(
+                shape=(None, None, int(64 / filters_div)),
+                name='stage2_input'),
+            ConvBlock(
+                kernel_size=3, filters=filters, stage=(2, 'a'), stride=1),
+            IdentityBlock(
+                kernel_size=3, filters=filters, stage=(2, 'b')),
+            IdentityBlock(
+                kernel_size=3, filters=filters, stage=(2, 'c')),
+        ],
+        name='stage2',
+    )
+
+
+def create_resnet_stage_3(filters_div: int):
+    filters = (
+        int(128 / filters_div),
+        int(128 / filters_div),
+        int(512 / filters_div))
+    return tf.keras.Sequential(
+        layers=[
+            layers.Input(
+                shape=(None, None, int(256 / filters_div)),
+                name='stage3_input'),
+            ConvBlock(kernel_size=3, filters=filters, stage=(3, 'a')),
+            IdentityBlock(kernel_size=3, filters=filters, stage=(3, 'b')),
+            IdentityBlock(kernel_size=3, filters=filters, stage=(3, 'c')),
+            IdentityBlock(kernel_size=3, filters=filters, stage=(3, 'd')),
+        ],
+        name='stage3')
+
+
+def create_resnet_stage_4(filters_div: int):
+    filters = (
+        int(256 / filters_div),
+        int(256 / filters_div),
+        int(1024 / filters_div))
+    return tf.keras.Sequential(
+        layers=[
+            layers.Input(
+                shape=(None, None, int(512 / filters_div)),
+                name='stage4_input'),
+            ConvBlock(kernel_size=3, filters=filters, stage=(4, 'a')),
+            IdentityBlock(kernel_size=3, filters=filters, stage=(4, 'b')),
+            IdentityBlock(kernel_size=3, filters=filters, stage=(4, 'c')),
+            IdentityBlock(kernel_size=3, filters=filters, stage=(4, 'd')),
+            IdentityBlock(kernel_size=3, filters=filters, stage=(4, 'e')),
+            IdentityBlock(kernel_size=3, filters=filters, stage=(4, 'f')),
+        ],
+        name='stage4')
+
+
+def create_resnet_stage_5(filters_div: int):
+    filters = (
+        int(512 / filters_div),
+        int(512 / filters_div),
+        int(2048 / filters_div))
+    return tf.keras.Sequential(
+        layers=[
+            layers.Input(
+                shape=(None, None, int(1024 / filters_div)),
+                name='stage5_input'),
+            ConvBlock(kernel_size=3, filters=filters, stage=(5, 'a')),
+            IdentityBlock(kernel_size=3, filters=filters, stage=(5, 'b')),
+            IdentityBlock(kernel_size=3, filters=filters, stage=(5, 'c')),
+        ],
+        name='stage5')
 
 
 # pylint: disable=abstract-method
@@ -91,8 +126,7 @@ class ConvBlock(tf.keras.Model):
         self.c_1 = layers.Conv2D(
             filters=f_1,
             kernel_size=(1, 1),
-            strides=(stride, stride),
-            padding='valid',
+            use_bias=False,
             name=conv_name_base + '2a',
         )
         self.bn1 = layers.BatchNormalization(axis=3, name=bn_name_base + '2a')
@@ -100,16 +134,16 @@ class ConvBlock(tf.keras.Model):
         self.c_2 = layers.Conv2D(
             filters=f_2,
             kernel_size=(kernel_size, kernel_size),
-            strides=(1, 1),
+            strides=(stride, stride),
             padding='same',
+            use_bias=False,
             name=conv_name_base + '2b')
         self.bn2 = layers.BatchNormalization(axis=3, name=bn_name_base + '2b')
 
         self.c_3 = layers.Conv2D(
             filters=f_3,
             kernel_size=(1, 1),
-            strides=(1, 1),
-            padding='valid',
+            use_bias=False,
             name=conv_name_base + '2c')
         self.bn3 = layers.BatchNormalization(axis=3, name=bn_name_base + '2c')
 
@@ -117,7 +151,7 @@ class ConvBlock(tf.keras.Model):
             filters=f_3,
             kernel_size=(1, 1),
             strides=(stride, stride),
-            padding='valid',
+            use_bias=False,
             name=conv_name_base + '1')
         self.bn4 = layers.BatchNormalization(axis=3, name=bn_name_base + '1')
 
@@ -165,8 +199,7 @@ class IdentityBlock(tf.keras.Model):
         self.c_1 = layers.Conv2D(
             filters=f_1,
             kernel_size=(1, 1),
-            strides=(1, 1),
-            padding='valid',
+            use_bias=False,
             name=conv_name_base + '2a')
         self.bn1 = layers.BatchNormalization(
             axis=3,
@@ -175,8 +208,8 @@ class IdentityBlock(tf.keras.Model):
         self.c_2 = layers.Conv2D(
             filters=f_2,
             kernel_size=(kernel_size, kernel_size),
-            strides=(1, 1),
             padding='same',
+            use_bias=False,
             name=conv_name_base + '2b')
         self.bn2 = layers.BatchNormalization(
             axis=3,
@@ -185,8 +218,7 @@ class IdentityBlock(tf.keras.Model):
         self.c_3 = layers.Conv2D(
             filters=f_3,
             kernel_size=(1, 1),
-            strides=(1, 1),
-            padding='valid',
+            use_bias=False,
             name=conv_name_base + '2c')
         self.bn3 = layers.BatchNormalization(
             axis=3,

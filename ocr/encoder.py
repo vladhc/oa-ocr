@@ -2,25 +2,36 @@ import tensorflow as tf
 import tensorflow.keras.layers as layers
 import tensorflow.keras.activations as activations
 
-from ocr.resnet import create_resnet_stage
+from ocr.resnet import create_resnet_stage_1
+from ocr.resnet import create_resnet_stage_2
+from ocr.resnet import create_resnet_stage_3
+from ocr.resnet import create_resnet_stage_4
+from ocr.resnet import create_resnet_stage_5
 
 
 # pylint: disable=abstract-method
 # pylint: disable=too-many-instance-attributes
 class ImageEncoder(tf.keras.Model):
 
-    def __init__(self, **kwargs):
+    def __init__(self, filters_div: int, grayscale: bool, **kwargs):
         super().__init__(kwargs)
-        self.resnet_stage_1 = create_resnet_stage(1)
-        self.resnet_stage_2 = create_resnet_stage(2)
-        self.resnet_stage_3 = create_resnet_stage(3)
-        self.resnet_stage_4 = create_resnet_stage(4)
-        self.resnet_stage_5 = create_resnet_stage(5)
+        self.resnet_stage_1 = create_resnet_stage_1(
+            filters_div,
+            input_ch=1 if grayscale else 3)
+        self.resnet_stage_2 = create_resnet_stage_2(filters_div)
+        self.resnet_stage_3 = create_resnet_stage_3(filters_div)
+        self.resnet_stage_4 = create_resnet_stage_4(filters_div)
+        self.resnet_stage_5 = create_resnet_stage_5(filters_div)
 
-        self.to_256ch_2 = layers.Conv2D(256, (1, 1), padding='same', name='to_256ch_2')
-        self.to_256ch_3 = layers.Conv2D(256, (1, 1), padding='same', name='to_256ch_3')
-        self.to_256ch_4 = layers.Conv2D(256, (1, 1), padding='same', name='to_256ch_4')
-        self.to_256ch_5 = layers.Conv2D(256, (1, 1), padding='same', name='to_256ch_5')
+        filters = int(256 / filters_div)
+        self.to_256ch_2 = layers.Conv2D(
+            filters, (1, 1), padding='same', name='to_256ch_2')
+        self.to_256ch_3 = layers.Conv2D(
+            filters, (1, 1), padding='same', name='to_256ch_3')
+        self.to_256ch_4 = layers.Conv2D(
+            filters, (1, 1), padding='same', name='to_256ch_4')
+        self.to_256ch_5 = layers.Conv2D(
+            filters, (1, 1), padding='same', name='to_256ch_5')
 
         self.up5_to_out = layers.UpSampling2D(size=(8, 8), name='up5_to_out')
         self.up5_to_in4 = layers.UpSampling2D(size=(2, 2), name='up5_to_in4')
@@ -29,10 +40,15 @@ class ImageEncoder(tf.keras.Model):
         self.up3_to_out = layers.UpSampling2D(size=(2, 2), name='up3_to_out')
         self.up3_to_in2 = layers.UpSampling2D(size=(2, 2), name='up3_to_in2')
 
-        self.conv_out5 = layers.Conv2D(64, (3, 3), padding='same', name='conv_p5')
-        self.conv_out4 = layers.Conv2D(64, (3, 3), padding='same', name='conv_p4')
-        self.conv_out3 = layers.Conv2D(64, (3, 3), padding='same', name='conv_p3')
-        self.conv_out2 = layers.Conv2D(64, (3, 3), padding='same', name='conv_p2')
+        filters = 64 / filters_div
+        self.conv_out5 = layers.Conv2D(
+            filters, (3, 3), padding='same', name='conv_p5')
+        self.conv_out4 = layers.Conv2D(
+            filters, (3, 3), padding='same', name='conv_p4')
+        self.conv_out3 = layers.Conv2D(
+            filters, (3, 3), padding='same', name='conv_p3')
+        self.conv_out2 = layers.Conv2D(
+            filters, (3, 3), padding='same', name='conv_p2')
 
     # pylint: disable=too-many-locals
     def call(self, inputs, training=False, mask=None):
@@ -85,13 +101,17 @@ class ImageEncoder(tf.keras.Model):
 
 class FeatureToImage(tf.keras.Model):
 
-    def __init__(self, **kwargs):
+    def __init__(self, filters_div: int, **kwargs):
         super().__init__(kwargs)
-        self.conv = layers.Conv2D(64, (3, 3), padding='same', use_bias=False)
-        self.bn_1 = layers.BatchNormalization()
-        self.deconv_1 = layers.Conv2DTranspose(64, (2, 2), strides=(2, 2), use_bias=False)
-        self.bn_2 = layers.BatchNormalization()
-        self.deconv_2 = layers.Conv2DTranspose(1, (2, 2), strides=(2, 2))
+        filters = int(64 / filters_div)
+        self.conv = layers.Conv2D(
+            filters, (3, 3), padding='same', use_bias=False)
+        self.bn_1 = layers.BatchNormalization(axis=3)
+        self.deconv_1 = layers.Conv2DTranspose(
+            filters, (2, 2), strides=(2, 2), use_bias=False)
+        self.bn_2 = layers.BatchNormalization(axis=3)
+        self.deconv_2 = layers.Conv2DTranspose(
+            1, (2, 2), strides=(2, 2))
 
     def call(self, inputs, training=False, mask=None):
         x = inputs

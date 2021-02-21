@@ -16,11 +16,11 @@ def decode_fn(record_bytes) -> Mapping[str, tf.Tensor]:
         'threshold_map': tf.io.FixedLenFeature([], dtype=tf.string),
     })
 
-def decode_image(record: Mapping[str, tf.Tensor]) -> Mapping[str, tf.Tensor]:
+def decode_image(record: Mapping[str, tf.Tensor], channels: int) -> Mapping[str, tf.Tensor]:
     return {
-        'img': tf.io.decode_jpeg(record['img']),
-        'prob_map': tf.io.decode_png(record['prob_map']),
-        'threshold_map': tf.io.decode_png(record['threshold_map']),
+        'img': tf.io.decode_jpeg(record['img'], channels),
+        'prob_map': tf.io.decode_png(record['prob_map'], channels),
+        'threshold_map': tf.io.decode_png(record['threshold_map'], channels),
     }
 
 def resize(
@@ -46,8 +46,9 @@ def cast(record: Mapping[str, tf.Tensor]) -> Mapping[str, tf.Tensor]:
 def create_dataset(
         fpaths: List[pathlib.Path],
         img_size: Tuple[int, int],
+        grayscale: bool,
         train: bool,
-        batch_size=32) -> tf.data.Dataset:
+        batch_size: int) -> tf.data.Dataset:
 
     tfrecords = list([str(p) for p in fpaths])
     assert tfrecords, \
@@ -75,7 +76,7 @@ def create_dataset(
         decode_fn,
         num_parallel_calls=AUTOTUNE)
     dataset = dataset.map(
-        decode_image,
+        functools.partial(decode_image, channels=1 if grayscale else 3),
         num_parallel_calls=AUTOTUNE)
     dataset = dataset.map(
         functools.partial(resize, target_size=img_size),
