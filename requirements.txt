@@ -8,6 +8,7 @@ Shapely>=1.7.1
 pyclipper>=1.2.1
 pyyaml>=5.4.1
 imgaug>=0.4.0
+faker>=6.4.1
 
 # dev
 mypy>=0.800

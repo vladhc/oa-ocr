@@ -208,5 +208,5 @@ def balance_loss(loss, gt, negative_ratio=3.):
 
 if __name__ == "__main__":
     train(
-        epochs=40,
+        epochs=100,
         batch_size=BATCH_SIZE)

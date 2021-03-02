@@ -1,4 +1,5 @@
 from typing import Tuple, List
+from enum import Enum
 import pathlib
 import io
 import random
@@ -10,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 import tqdm
 import tensorflow as tf
 from imgaug import augmenters as iaa
+from faker import Faker
 
 
 FONTS_DIR = pathlib.Path('assets/fonts')
@@ -17,7 +19,7 @@ VOCAB_DIR = pathlib.Path('assets/vocab')
 
 
 FONT_SIZE = (10, 20)
-LINES_COUNT = (2, 30)
+LINES_COUNT = (2, 20)
 LINE_WIDTH = (1, 3)
 WORDS_COUNT = (3, 300)
 FONT_COLOR = (0, 200)
@@ -29,6 +31,18 @@ PNG_FORMAT = 'PNG'
 
 MAX_ROTATION_DEGREES = 5.
 
+CHARS = [
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+    "А", "Б", "В", "Г", "Д", "Е", "Ё", "Ж", "З", "И", "Й", "К", "Л", "М", "Н",
+    "О", "П", "Р", "С", "Т", "У", "Ф", "Х", "Ц", "Ч", "Ш", "Щ", "Ъ", "Ы", "Ь",
+    "Э", "Ю", "Я",
+    "а", "б", "в", "г", "д", "е", "ё", "ж", "з", "и", "й", "к", "л", "м", "н",
+    "о", "п", "р", "с", "т", "у", "ф", "х", "ц", "ч", "ш", "щ", "ъ", "ы", "ь",
+    "э", "ю", "я",
+    ".", ",", "/", "\\", ";", ":", "*", "-", "_", "%", "!", "[", "]", "(", ")",
+    "№", "#",
+]
+
 IMAGE_AUG = iaa.Sequential([
     iaa.Sometimes(0.25, iaa.AdditiveGaussianNoise(scale=(4, 10))),
     iaa.Sometimes(0.2, iaa.GaussianBlur(sigma=0.7)),
@@ -37,9 +51,18 @@ IMAGE_AUG = iaa.Sequential([
     iaa.Sometimes(0.2, iaa.JpegCompression(compression=(10, 30))),
 ])
 
+class ShapeType(Enum):
+    RECT = 1
+    LINE_HOR = 2
+    LINE_VERT = 3
+    LINE_RAND = 4
 
-def write_tfrecords(fname: str, size: int, img_size: Tuple[int, int]):
+
+def write_tfrecords(fname: str, size: int, img_size: Tuple[int, int], seed):
     gen = DatasetGenerator()
+
+    np.random.seed(seed)
+    random.seed(seed)
 
     with tf.io.TFRecordWriter(fname) as file_writer:
         for _ in tqdm.tqdm(range(size)):
@@ -60,6 +83,7 @@ class DatasetGenerator():
         for vocab_file in VOCAB_DIR.glob("*.txt"):
             lines = vocab_file.read_text().split()
             self.vocab.extend(lines)
+        self.fake = Faker('ru_RU')
 
     def create_sample(
         self,
@@ -78,7 +102,11 @@ class DatasetGenerator():
                 font=random.choice(self.fonts),
                 size=random.randint(*FONT_SIZE))
 
-            text = random.choice(self.vocab)
+            if random.random() > 0.9:
+                text = self.fake.lexify('?' * random.randint(1, 8), letters=CHARS)
+                text = ''.join(text.split())  # in case we have (multiple) whitespaces inside
+            else:
+                text = random.choice(self.vocab)
             bbox = fnt.getbbox(text)
             width = bbox[0] + bbox[2]
             height = bbox[1] + bbox[3]
@@ -100,16 +128,50 @@ class DatasetGenerator():
             draw.text(coord, text, font=fnt, fill=(ink, ink, ink))
 
         for _ in range(random.randint(*LINES_COUNT)):
-            coords = (
-                random.randint(0, img.width),
-                random.randint(0, img.height),
-                random.randint(0, img.width),
-                random.randint(0, img.height))
+            shapeType = random.choice(list(ShapeType))
             ink = random.randint(*FONT_COLOR)
-            draw.line(
-                coords,
-                fill=(ink, ink, ink),
-                width=random.randint(*LINE_WIDTH))
+            if shapeType == ShapeType.LINE_RAND:
+                coords = (
+                    random.randint(0, img.width),
+                    random.randint(0, img.height),
+                    random.randint(0, img.width),
+                    random.randint(0, img.height))
+                draw.line(
+                    coords,
+                    fill=(ink, ink, ink),
+                    width=random.randint(*LINE_WIDTH))
+            elif shapeType == ShapeType.LINE_VERT:
+                x = random.randint(0, img.width)
+                coords = (
+                    x,
+                    random.randint(0, img.height),
+                    x,
+                    random.randint(0, img.height))
+                draw.line(
+                    coords,
+                    fill=(ink, ink, ink),
+                    width=random.randint(*LINE_WIDTH))
+            elif shapeType == ShapeType.LINE_HOR:
+                y = random.randint(0, img.height)
+                coords = (
+                    random.randint(0, img.width),
+                    y,
+                    random.randint(0, img.width),
+                    y)
+                draw.line(
+                    coords,
+                    fill=(ink, ink, ink),
+                    width=random.randint(*LINE_WIDTH))
+            elif shapeType == ShapeType.RECT:
+                coords = (
+                    random.randint(0, img.width),
+                    random.randint(0, img.height),
+                    random.randint(0, img.width),
+                    random.randint(0, img.height))
+                draw.rectangle(
+                    coords,
+                    outline=(ink, ink, ink),
+                    width=random.randint(*LINE_WIDTH))
 
         img = Image.fromarray(IMAGE_AUG(images=[np.array(img)])[0])
 
