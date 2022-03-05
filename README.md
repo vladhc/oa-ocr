@@ -15,6 +15,8 @@ Model is implemented in TensorFlow with Keras. The appoach is to split the model
 That's necessary as the model which is used for inference phase is a bit different than the one which is used during trainging phase.
 There is a ResNet in sources. I tried to use the ResNet from TF Hub, but at that time it didn't allowed to take only first N layers (and I needed that for DB model).
 
+![Model Architecture](docs/architecture.png?raw=true)
+
 ## Dataset
 
 Dataset is generated using different fonts and image augmentation. See `generate-dataset.py`. Output of this script is a set tfrecord files which are fed into the model during training.
